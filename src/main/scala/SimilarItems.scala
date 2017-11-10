@@ -1,7 +1,6 @@
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
-import scala.collection.SortedSet
 import scala.util.Random
 
 object SimilarItems {
@@ -32,7 +31,7 @@ object SimilarItems {
       .map({ case (a, b) => (x: Int) => (a * x + b) % Int.MaxValue }) // create hash functions
       .toList
 
-    val t = 0.4 // min threshold
+    val t = 0.9 // min threshold
 
     // Calculate document signatures from their shingles using MinHashing
     val signatures = shingles
@@ -97,18 +96,7 @@ object SimilarItems {
 
   // 2. A class CompareSets that estimates the Jaccard similarity of two sets of integers – two sets of hashed shingles.
   def compareSets(A: Set[Int], B: Set[Int]): Double = {
-    def compare(A: SortedSet[Int], B: SortedSet[Int], sizeIntersection: Int, sizeUnion: Int): Double = {
-      if (A.isEmpty && B.isEmpty)
-        sizeUnion.toDouble / sizeIntersection.toDouble
-      else if (A.isEmpty || B.nonEmpty && A.head > B.head)
-        compare(A, B.tail, sizeIntersection + 1, sizeUnion)
-      else if (B.isEmpty || A.nonEmpty && A.head < B.head)
-        compare(A.tail, B, sizeIntersection + 1, sizeUnion)
-      else // A.head == B.head
-        compare(A.tail, B.tail, sizeIntersection + 1, sizeUnion + 1)
-    }
-
-    compare(A.to[SortedSet], B.to[SortedSet], 0, 0)
+    A.intersect(B).size.toDouble / A.union(B).size
   }
 
   // 3. A class MinHashing that builds a minHash signature (in the form of a vector or a set) of a given length n from a
