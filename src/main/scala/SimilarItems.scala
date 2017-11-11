@@ -89,7 +89,7 @@ object SimilarItems {
       .toSet
   }
 
-  // Hashes a set of shingles to a single integer
+  // Hashes a set of shingles to a set of integers
   def hashShingles(shingles: Set[String]): Set[Int] = {
     shingles.map(_.hashCode)
   }
@@ -120,20 +120,20 @@ object SimilarItems {
     println("LSH: b = %d, r = %d, s = %d, numBuckets = %d, t ~ %.6f"
       .format(b, r, s, numBuckets, Math.pow(1 / b.toDouble, 1 / r.toDouble)))
 
-    // Create a RDD (bucket, doc) where each doc is associated with multiple buckets
+    // Create a RDD ((bucket, bandIndex), (doc, signature)) where each doc is associated with one bucket for every bandIndex
     val docsInBuckets = docs
       .flatMap({ case (doc, signature) =>
-        signature.grouped(r).map(g => { // take r rows at a time
-          val bucket = Math.floorMod(g.hashCode(), numBuckets) // hash to bucket
-          (bucket, (doc, signature))
+        signature.grouped(r).zipWithIndex.map({ case (rows, bandIndex) => // take r rows at a time
+          val bucket = Math.floorMod(rows.hashCode(), numBuckets) // hash to bucket
+          ((bandIndex, bucket), (doc, signature))
         })
       })
 
     // Determine candidate pairs
     val candidatePairs = docsInBuckets
-      .groupByKey() // group by bucket
-      .flatMap({ case (bucket, docsInBucket) => docsInBucket.crossProduct(docsInBucket) }) // take product per bucket
-      .map({ case (doc1, doc2) => if (doc1._1 < doc2._1) (doc1, doc2) else (doc2, doc1) }) // since (x, y) = (y, x)
+      .groupByKey() // group by (bandIndex, bucket)
+      .flatMap({ case (_, docsInBucket) => docsInBucket.crossProduct(docsInBucket) }) // product per (bandIndex, bucket)
+      .map({ case (doc1, doc2) => if (doc1._1 < doc2._1) (doc1, doc2) else (doc2, doc1) }) // similarity is symmetric
       .filter({ case (doc1, doc2) => doc1._1 != doc2._1 }) // remove pairs of the same document
       .distinct()
 
